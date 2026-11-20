@@ -10,9 +10,12 @@
   html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   #hint{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:10;
     background:rgba(17,24,39,.82);color:#fff;padding:10px 16px;border-radius:999px;font-size:15px;white-space:nowrap}
+  #reset{position:fixed;right:14px;top:14px;z-index:10;border:0;border-radius:999px;padding:10px 14px;
+    background:rgba(255,255,255,.92);color:#111;font-size:15px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 </style>
 </head>
 <body>
+<button id="reset" aria-label="Asl holatga qaytarish">↺ Asl holat</button>
 <div id="hint">📷 Kamerani kitob muqovasiga qarating</div>
 
 <a-scene mindar-image="imageTargetSrc: ./targets.mind; uiScanning: no; filterMinCF: 0.0001; filterBeta: 0.001"
@@ -29,17 +32,44 @@
 
   <!-- Muqova rasmi kengligi = 1 birlik. Oktant shu rasm ustida tik turadi. -->
   <a-entity id="target" mindar-image-target="targetIndex: 0">
-    <!-- X chapga, Y o'quvchi tomonga, Z yuqoriga; kitob markazi muqova markazida -->
-    <a-entity position="0.585 0.405 0" rotation="0 0 -90">
-      <a-gltf-model src="#oktant" rotation="90 0 0" scale="4.5 4.5 4.5"></a-gltf-model>
+    <!-- Ekran/doska uchun: V tekislik = rasm tekisligi; X chapga, Z yuqoriga, Y o'quvchiga qarab.
+         pivot — barmoq bilan aylantirish markazi (kitob markazi) -->
+    <a-entity id="pivot" position="0 0 0.405">
+      <a-gltf-model src="#oktant" rotation="0 -90 0" scale="4.5 4.5 4.5" position="0.585 -0.648 -0.405"></a-gltf-model>
     </a-entity>
   </a-entity>
 </a-scene>
 
 <script>
   const t=document.getElementById('target'), hint=document.getElementById('hint');
-  t.addEventListener('targetFound',()=>{hint.textContent="✅ Topildi! Telefonni aylantirib ko'ring";});
+  t.addEventListener('targetFound',()=>{hint.textContent="✅ Barmoq bilan suring: aylanadi. Ikki barmoq: kattalashadi";});
   t.addEventListener('targetLost',()=>{hint.textContent="📷 Kamerani kitob muqovasiga qarating";});
+
+  // Barmoq bilan aylantirish va ikki barmoq bilan kattalashtirish
+  const pivot=document.getElementById('pivot');
+  let rx=0, ry=0, sc=1, last=null, pinch=null;
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  function apply(){const o=pivot.object3D;o.rotation.set(rx,ry,0);o.scale.set(sc,sc,sc);}
+  const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+  document.addEventListener('touchstart',e=>{
+    if(e.target.id==='reset')return;
+    if(e.touches.length===1){last={x:e.touches[0].clientX,y:e.touches[0].clientY};pinch=null;}
+    else if(e.touches.length===2){pinch={d:dist(e.touches),s:sc};last=null;}
+  },{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(e.touches.length===1&&last){
+      const x=e.touches[0].clientX,y=e.touches[0].clientY;
+      ry+=(x-last.x)*0.01; rx=clamp(rx+(y-last.y)*0.01,-1.2,1.2); last={x,y}; apply();
+    } else if(e.touches.length===2&&pinch){ sc=clamp(pinch.s*dist(e.touches)/pinch.d,0.4,2.5); apply(); }
+  },{passive:true});
+  document.addEventListener('touchend',e=>{if(e.touches.length===0){last=null;pinch=null;}},{passive:true});
+  // Kompyuter sichqonchasi uchun ham
+  let md=null;
+  document.addEventListener('mousedown',e=>{if(e.target.id!=='reset')md={x:e.clientX,y:e.clientY};});
+  document.addEventListener('mousemove',e=>{if(!md)return;ry+=(e.clientX-md.x)*0.01;rx=clamp(rx+(e.clientY-md.y)*0.01,-1.2,1.2);md={x:e.clientX,y:e.clientY};apply();});
+  document.addEventListener('mouseup',()=>md=null);
+  document.addEventListener('wheel',e=>{sc=clamp(sc*(e.deltaY<0?1.1:0.9),0.4,2.5);apply();},{passive:true});
+  document.getElementById('reset').addEventListener('click',()=>{rx=0;ry=0;sc=1;apply();});
 </script>
 </body>
 </html>
