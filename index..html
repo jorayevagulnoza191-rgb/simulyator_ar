@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O'tkan kunlar — rasm orqali AR</title>
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  #hint{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:10;
+    background:rgba(17,24,39,.82);color:#fff;padding:10px 16px;border-radius:999px;font-size:15px;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="hint">📷 Kamerani kitob muqovasiga qarating</div>
+
+<a-scene mindar-image="imageTargetSrc: ./targets.mind; uiScanning: no; filterMinCF: 0.0001; filterBeta: 0.001"
+         color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights"
+         vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+  <a-assets>
+    <a-asset-item id="oktant" src="./oktant_ar.glb"></a-asset-item>
+  </a-assets>
+
+  <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+  <a-light type="ambient" intensity="1.2"></a-light>
+  <a-light type="directional" intensity="1" position="1 2 3"></a-light>
+
+  <!-- Muqova rasmi kengligi = 1 birlik. Oktant shu rasm ustida tik turadi. -->
+  <a-entity id="target" mindar-image-target="targetIndex: 0">
+    <!-- X chapga, Y o'quvchi tomonga, Z yuqoriga; kitob markazi muqova markazida -->
+    <a-entity position="0.585 0.405 0" rotation="0 0 -90">
+      <a-gltf-model src="#oktant" rotation="90 0 0" scale="4.5 4.5 4.5"></a-gltf-model>
+    </a-entity>
+  </a-entity>
+</a-scene>
+
+<script>
+  const t=document.getElementById('target'), hint=document.getElementById('hint');
+  t.addEventListener('targetFound',()=>{hint.textContent="✅ Topildi! Telefonni aylantirib ko'ring";});
+  t.addEventListener('targetLost',()=>{hint.textContent="📷 Kamerani kitob muqovasiga qarating";});
+</script>
+</body>
+</html>
