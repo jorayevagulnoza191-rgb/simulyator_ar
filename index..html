@@ -2,20 +2,29 @@
 <html lang="uz">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>O'tkan kunlar — rasm orqali AR</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  html,body{margin:0;height:100%;overflow:hidden;touch-action:none;overscroll-behavior:none;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   #hint{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:10;
     background:rgba(17,24,39,.82);color:#fff;padding:10px 16px;border-radius:999px;font-size:15px;white-space:nowrap}
   #reset{position:fixed;right:14px;top:14px;z-index:10;border:0;border-radius:999px;padding:10px 14px;
     background:rgba(255,255,255,.92);color:#111;font-size:15px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+  #pad{position:fixed;left:14px;bottom:80px;z-index:10;display:flex;flex-direction:column;align-items:center;gap:6px}
+  #pad div{display:flex;gap:44px}
+  #pad button{width:52px;height:52px;border:0;border-radius:14px;background:rgba(255,255,255,.92);font-size:22px;
+    box-shadow:0 2px 8px rgba(0,0,0,.25);touch-action:none}
 </style>
 </head>
 <body>
 <button id="reset" aria-label="Asl holatga qaytarish">↺ Asl holat</button>
+<div id="pad">
+  <button data-r="up" aria-label="Yuqoriga egish">▲</button>
+  <div><button data-r="left" aria-label="Chapga aylantirish">◀</button><button data-r="right" aria-label="O'ngga aylantirish">▶</button></div>
+  <button data-r="down" aria-label="Pastga egish">▼</button>
+</div>
 <div id="hint">📷 Kamerani kitob muqovasiga qarating</div>
 
 <a-scene mindar-image="imageTargetSrc: ./targets.mind; uiScanning: no; filterMinCF: 0.0001; filterBeta: 0.001"
@@ -49,26 +58,42 @@
   const pivot=document.getElementById('pivot');
   let rx=0, ry=0, sc=1, last=null, pinch=null;
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-  function apply(){const o=pivot.object3D;o.rotation.set(rx,ry,0);o.scale.set(sc,sc,sc);}
+  const D=180/Math.PI;
+  function apply(){
+    pivot.setAttribute('rotation',{x:rx*D,y:ry*D,z:0});
+    pivot.setAttribute('scale',{x:sc,y:sc,z:sc});
+  }
   const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
-  document.addEventListener('touchstart',e=>{
-    if(e.target.id==='reset')return;
+  const onUI=e=>e.target.closest&&e.target.closest('#pad,#reset');
+  window.addEventListener('touchstart',e=>{
+    if(onUI(e))return;
     if(e.touches.length===1){last={x:e.touches[0].clientX,y:e.touches[0].clientY};pinch=null;}
     else if(e.touches.length===2){pinch={d:dist(e.touches),s:sc};last=null;}
-  },{passive:true});
-  document.addEventListener('touchmove',e=>{
+  },{passive:false,capture:true});
+  window.addEventListener('touchmove',e=>{
+    if(onUI(e))return;
+    e.preventDefault();
     if(e.touches.length===1&&last){
       const x=e.touches[0].clientX,y=e.touches[0].clientY;
-      ry+=(x-last.x)*0.01; rx=clamp(rx+(y-last.y)*0.01,-1.2,1.2); last={x,y}; apply();
+      ry+=(x-last.x)*0.012; rx=clamp(rx+(y-last.y)*0.012,-1.3,1.3); last={x,y}; apply();
     } else if(e.touches.length===2&&pinch){ sc=clamp(pinch.s*dist(e.touches)/pinch.d,0.4,2.5); apply(); }
-  },{passive:true});
-  document.addEventListener('touchend',e=>{if(e.touches.length===0){last=null;pinch=null;}},{passive:true});
-  // Kompyuter sichqonchasi uchun ham
+  },{passive:false,capture:true});
+  window.addEventListener('touchend',e=>{if(e.touches.length===0){last=null;pinch=null;}},{capture:true});
+  // Kompyuter sichqonchasi uchun
   let md=null;
-  document.addEventListener('mousedown',e=>{if(e.target.id!=='reset')md={x:e.clientX,y:e.clientY};});
-  document.addEventListener('mousemove',e=>{if(!md)return;ry+=(e.clientX-md.x)*0.01;rx=clamp(rx+(e.clientY-md.y)*0.01,-1.2,1.2);md={x:e.clientX,y:e.clientY};apply();});
-  document.addEventListener('mouseup',()=>md=null);
-  document.addEventListener('wheel',e=>{sc=clamp(sc*(e.deltaY<0?1.1:0.9),0.4,2.5);apply();},{passive:true});
+  window.addEventListener('mousedown',e=>{if(!onUI(e))md={x:e.clientX,y:e.clientY};});
+  window.addEventListener('mousemove',e=>{if(!md)return;ry+=(e.clientX-md.x)*0.012;rx=clamp(rx+(e.clientY-md.y)*0.012,-1.3,1.3);md={x:e.clientX,y:e.clientY};apply();});
+  window.addEventListener('mouseup',()=>md=null);
+  window.addEventListener('wheel',e=>{sc=clamp(sc*(e.deltaY<0?1.1:0.9),0.4,2.5);apply();},{passive:true});
+  // Tugmalar: bosib tursa uzluksiz aylanadi
+  let hold=null;
+  const step={left:()=>ry-=0.05,right:()=>ry+=0.05,up:()=>rx=clamp(rx-0.05,-1.3,1.3),down:()=>rx=clamp(rx+0.05,-1.3,1.3)};
+  document.querySelectorAll('#pad button').forEach(b=>{
+    const go=e=>{e.preventDefault();const f=step[b.dataset.r];f();apply();clearInterval(hold);hold=setInterval(()=>{f();apply();},40);};
+    const stop=()=>{clearInterval(hold);hold=null;};
+    b.addEventListener('touchstart',go,{passive:false});b.addEventListener('mousedown',go);
+    ['touchend','touchcancel','mouseup','mouseleave'].forEach(ev=>b.addEventListener(ev,stop));
+  });
   document.getElementById('reset').addEventListener('click',()=>{rx=0;ry=0;sc=1;apply();});
 </script>
 </body>
